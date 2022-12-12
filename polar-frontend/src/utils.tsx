@@ -1,3 +1,10 @@
+import {DateByNumToWorkoutID} from "./types";
+
+// Replace the very odd behavior of javascript's default modulo function.
+export function mod(n: number, m: number) {
+    return ((n % m) + m) % m;
+}
+
 const RUNNING_IN_JEST = process.env.JEST_WORKER_ID !== undefined;
 export function runningInJest() {
     return RUNNING_IN_JEST;
@@ -44,7 +51,7 @@ export function debugDump(obj: Object) {
         if (recursionDepth > maxDepth) {
             return o.toString();
         } else {
-            const newDepth = depth+1;
+            const newDepth = depth + 1;
             const lawl = Array.from(Object.entries(o).map(([key, val]) => ([key, ":", "\u00a0".repeat(2), ddHelper(val, newDepth)])));
             const indented = fmap(lawl, newDepth);
             const first = indented.shift();
@@ -55,4 +62,15 @@ export function debugDump(obj: Object) {
     }
 
     return ddHelper(obj, -1);
+}
+
+export function getWorkoutIDsByDate(date: Date, dateByNumToWorkoutID: DateByNumToWorkoutID) {
+    const [year, month, day] = getDateTriad(date);
+    const workoutIDs = Array.from(dateByNumToWorkoutID[year]?.[month]?.[day] ?? []);
+    return workoutIDs;
+}
+
+// NOTE: getMonth and getDate both return 0-indexed values, so we bump them here
+export function getDateTriad(date: Date) {
+    return [date.getFullYear(), date.getMonth() + 1, date.getDate() + 1]
 }
