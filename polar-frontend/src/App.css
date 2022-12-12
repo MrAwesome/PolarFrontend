@@ -31,3 +31,20 @@
     font-style: normal;
     font-weight: bold;
 }
+
+
+.cal-and-active {
+    display: flex;
+}
+
+.polar-calendar {
+    display: inline-block;
+}
+
+.active-workout {
+    display: inline-block;
+    text-align: left;
+    max-height: 400px;
+    height: 400px;
+    overflow: scroll;
+}
