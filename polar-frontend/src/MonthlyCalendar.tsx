@@ -8,21 +8,24 @@ import {getWorkoutIDsByDate, mod} from './utils';
 interface MonthlyCalendarProps {
     dateByNumToWorkoutID: DateByNumToWorkoutID,
     loadWorkout: (id: WorkoutID) => void,
+    activeWorkoutID: WorkoutID | null;
 }
 
 interface MonthlyCalendarState {
     date: Date;
+    activeWorkoutID: WorkoutID | null;
     lastClickedDate?: Date;
     lastClickedDateIndex?: number;
 }
 
 export default class MonthlyCalendar extends React.Component<MonthlyCalendarProps, MonthlyCalendarState> {
-    buttonLock: boolean = false;
+    //buttonLock = false;
 
     constructor(props: MonthlyCalendarProps) {
         super(props);
         this.state = {
-            date: new Date()
+            date: new Date(),
+            activeWorkoutID: this.props.activeWorkoutID,
         };
 
         this.tileContent = this.tileContent.bind(this);
@@ -35,20 +38,26 @@ export default class MonthlyCalendar extends React.Component<MonthlyCalendarProp
     tileContent(
         args: {activeStartDate: Date, date: Date, view: string}
     ) {
-        const {loadWorkout, dateByNumToWorkoutID} = this.props;
+        const {dateByNumToWorkoutID, activeWorkoutID} = this.props;
         const {date} = args;
 
         const workoutIDs = getWorkoutIDsByDate(date, dateByNumToWorkoutID);
         const idLinks = workoutIDs.map((id) =>
-            <button onClick={(_e) => {
-                this.buttonLock = true;
-                setTimeout(() => this.buttonLock = false, 10);
-                this.setState({lastClickedDate: date, lastClickedDateIndex: workoutIDs.indexOf(id)});
-                return loadWorkout(id);
-            }
-            }>
+
+//            onClick={(_e) => {
+//                this.buttonLock = true;
+//                setTimeout(() => this.buttonLock = false, 10);
+//                this.setState({lastClickedDate: date, lastClickedDateIndex: workoutIDs.indexOf(id)});
+//                return loadWorkout(id);
+//            }
+//            }
+            <div className="monthly-calendar-workout-id"
+                style={activeWorkoutID === id
+                    ? {background: "blue"}
+                    : {}
+                }>
                 {id}
-            </button>)
+            </div>)
 
         return <div className="day-workouts-list">{idLinks}</div>
     }
@@ -57,7 +66,7 @@ export default class MonthlyCalendar extends React.Component<MonthlyCalendarProp
         return (
             <Calendar
                 onClickDay={(date: Date, _event: any) => {
-                    if (this.buttonLock === true) {return;}
+                    //if (this.buttonLock === true) {return;}
                     const {lastClickedDate, lastClickedDateIndex} = this.state;
                     const {loadWorkout, dateByNumToWorkoutID} = this.props;
 
@@ -86,7 +95,7 @@ export default class MonthlyCalendar extends React.Component<MonthlyCalendarProp
                 }}
                 onChange={this.onChange}
                 value={this.state.date}
-                tileContent={this.tileContent}
+                tileContent={(args: {activeStartDate: Date, date: Date, view: string}) => this.tileContent(args)} // NOTE: using lambda here to force a refresh if props change
                 view="month"
             />
         );

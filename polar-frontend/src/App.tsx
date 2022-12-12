@@ -4,7 +4,7 @@ import MonthlyCalendar from "./MonthlyCalendar";
 
 import './App.css';
 import {debugDump, setTimeoutButNotInProdOrTests} from './utils';
-import {EverythingData, TagType, WorkoutID, WorkoutRaw} from './types';
+import {EquipmentType, EverythingData, TagName, TagType, WorkoutID, WorkoutRaw} from './types';
 import {DataParser} from './DataParser';
 
 // Search:
@@ -24,26 +24,43 @@ export interface AppState {
     lastSearch?: string,
     activeWorkout: WorkoutRaw | null,
     data: EverythingData | null,
-    results: {tagTypes: TagType[]} | null,
+    autoCompleteResults: Results,
+    activeFilters: Results,
+    availableFilters: Results,
+}
+
+export interface Results {
+    tagTypes: Set<TagType>,
+    tagNames: Set<TagName>,
+    equipmentTypes: Set<EquipmentType>,
 }
 
 class App extends React.Component<AppProps, AppState> {
     textInput: React.RefObject<HTMLInputElement> = React.createRef();
     currentMountAttempt = 0;
+    buttonLock = false;
 
     constructor(props: any) {
         super(props);
 
-        this.state = {currentQuery: "", data: null, activeWorkout: null, results: null}
+        this.state = {
+            currentQuery: "",
+            data: null,
+            activeWorkout: null,
+            autoCompleteResults: {tagTypes: new Set(), tagNames: new Set(), equipmentTypes: new Set()},
+            activeFilters: {tagTypes: new Set(), tagNames: new Set(), equipmentTypes: new Set()},
+            availableFilters: {tagTypes: new Set(), tagNames: new Set(), equipmentTypes: new Set()},
+        }
 
         this.autoComplete = this.autoComplete.bind(this);
         this.getCalendar = this.getCalendar.bind(this);
         this.getSearchBar = this.getSearchBar.bind(this);
         this.loadData = this.loadData.bind(this);
-        this.parseData = this.parseData.bind(this);
         this.loadWorkout = this.loadWorkout.bind(this);
         this.onChange = this.onChange.bind(this);
         this.onSubmit = this.onSubmit.bind(this);
+        this.parseData = this.parseData.bind(this);
+        this.populateFilters = this.populateFilters.bind(this);
         this.search = this.search.bind(this);
     }
 
@@ -62,10 +79,6 @@ class App extends React.Component<AppProps, AppState> {
         protecc(async () => {
             if (this.currentMountAttempt === savedMountAttempt) {
                 this.loadData().then(this.parseData);
-
-                if (existingQuery !== undefined) {
-                    this.autoComplete();
-                }
             } else {
                 console.warn("Detected double-mount, not fetching data...");
             }
@@ -83,7 +96,7 @@ class App extends React.Component<AppProps, AppState> {
         return rawData;
     }
 
-    parseData(rawData: any) {
+    async parseData(rawData: any) {
         // TODO: better type checking later
         if (!("workouts" in rawData)) {
             console.error("Data format is incorrect!");
@@ -99,7 +112,28 @@ class App extends React.Component<AppProps, AppState> {
         //@ts-ignore
         window.data = data;
 
-        this.setState({data}, this.autoComplete);
+
+        this.setState({data}, async () => {
+            this.populateFilters();
+            this.autoComplete();
+        });
+    }
+
+    populateFilters() {
+        const {data} = this.state;
+
+        if (data === null) {return;}
+        const {tagsByTagType, equipmentByEquipmentType} = data;
+
+        const tagTypes = new Set(Object.keys(tagsByTagType));
+//            .map((tag) => tag.toLowerCase())
+//            .filter((tag) => tag.startsWith(currentQuery))
+//            .map((tag) => tag.toUpperCase()));
+
+        const equipmentTypes = new Set(Object.keys(equipmentByEquipmentType));
+//            .filter((equip) => equip.startsWith(currentQuery)));
+
+        this.setState({availableFilters: {...this.state.availableFilters, tagTypes, equipmentTypes}});
     }
 
     autoComplete() {
@@ -110,14 +144,6 @@ class App extends React.Component<AppProps, AppState> {
         if (data === null || currentQuery === undefined) {
             return;
         }
-        const {tagsByTagType} = data;
-
-        const tagTypes = Object.keys(tagsByTagType)
-            .map((tag) => tag.toLowerCase())
-            .filter((tag) => tag.startsWith(currentQuery))
-            .map((tag) => tag.toUpperCase());
-
-        this.setState({results: {tagTypes}});
     }
 
     search() {
@@ -143,7 +169,7 @@ class App extends React.Component<AppProps, AppState> {
     }
 
     getSearchBar() {
-        const {lastAutocomplete, lastSearch, results} = this.state;
+        const {lastAutocomplete, lastSearch, activeFilters, availableFilters} = this.state;
         return <div className="polar-search">
             <form onSubmit={this.onSubmit} autoComplete="off" >
                 <input
@@ -168,17 +194,52 @@ class App extends React.Component<AppProps, AppState> {
             </div>
 
             <div className="results-debug">
-                Tag Types: {results?.tagTypes.map((tagType) => 
-                    <button className="tagtype-button">{tagType}</button>)}
+                Tag Types: {Array.from(availableFilters?.tagTypes ?? []).map((tagType) => 
+                    <button className="tagtype-button"
+                        style={activeFilters?.tagTypes?.has(tagType) ? {background: "blue"} : {}}
+                        onClick={(_e) => this.setState((state) => {
+                            if (!this.buttonLock) {
+                                this.buttonLock = true;
+                                setTimeout(() => this.buttonLock = false, 10);
+
+                                if (state.activeFilters?.tagTypes?.has(tagType)) {
+                                    state.activeFilters.tagTypes.delete(tagType);
+                                } else {
+                                    state.activeFilters.tagTypes.add(tagType);
+                                }
+                            }
+
+                            return state;
+                        })}>
+                        {tagType}</button>)}
+                <br />
+                Equipment Types: {Array.from(availableFilters?.equipmentTypes ?? []).map((equipmentType) => 
+                    <button className="equipmenttype-button"
+                        style={activeFilters?.equipmentTypes?.has(equipmentType) ? {background: "blue"} : {}}
+                        onClick={(_e) => this.setState((state) => {
+                            if (!this.buttonLock) {
+                                this.buttonLock = true;
+                                setTimeout(() => this.buttonLock = false, 10);
+
+                                if (state.activeFilters?.equipmentTypes?.has(equipmentType)) {
+                                    state.activeFilters.equipmentTypes.delete(equipmentType);
+                                } else {
+                                    state.activeFilters.equipmentTypes.add(equipmentType);
+                                }
+                            }
+
+                            return state;
+                        })}>
+                        {equipmentType}</button>)}
             </div>
         </div>
     }
 
     getCalendar() {
-        const {data} = this.state;
+        const {data, activeWorkout} = this.state;
         const dbynum = data?.dateByNumToWorkoutID ?? null;
         const cal = dbynum !== null
-            ? <MonthlyCalendar dateByNumToWorkoutID={dbynum} loadWorkout={this.loadWorkout} />
+            ? <MonthlyCalendar dateByNumToWorkoutID={dbynum} loadWorkout={this.loadWorkout} activeWorkoutID={activeWorkout?.id.toString() ?? null} />
             : null;
         return <div className="polar-calendar">
             {cal}
